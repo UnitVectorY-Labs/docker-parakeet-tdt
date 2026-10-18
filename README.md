@@ -91,6 +91,13 @@ the client:
 python3 tests/transcribe.py recording.wav --base-url http://127.0.0.1:8080
 ```
 
+For a reproducible sample, use upstream's 11-second, mono 16 kHz JFK recording:
+
+```sh
+curl --fail -L https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/caa3f47c7c75fa2e9e6340272ebad57c1647dd44/test_files/asr/wav/test/jfk.wav -o jfk.wav
+python3 tests/transcribe.py jfk.wav --base-url http://127.0.0.1:8080
+```
+
 The test sends an actual multipart upload, requires nonempty text and words,
 checks finite, ordered word timestamps within the recording duration, and
 prints the full timestamped JSON. It fails on HTTP errors or missing timestamps.

@@ -13,6 +13,15 @@ shutil.copy2('/opt/nemo/bin/nemo-speech', prefix / 'bin/nemo-speech')
 shutil.copytree('/opt/nemo/share/licenses', prefix / 'share/licenses')
 for name in ('LICENSE', 'NOTICE', 'THIRD_PARTY_NOTICES.md'):
     shutil.copy2('/src/' + name, prefix / 'share/licenses/nemo-speech' / name)
+notices = prefix / 'share/licenses/runtime'
+notices.mkdir()
+for path in [Path('/usr/local/cuda/EULA.txt'), Path('/NGC-DL-CONTAINER-LICENSE'),
+             *Path('/usr/share/doc').glob('libgomp*/copyright'),
+             *Path('/usr/share/doc').glob('libsentencepiece*/copyright'),
+             *Path('/usr/share/doc').glob('libcublas*/copyright'),
+             *Path('/usr/share/doc').glob('cuda-cudart*/copyright')]:
+    if path.is_file():
+        shutil.copy2(path, notices / f'{path.parent.name}-{path.name}')
 
 # cc-debian13 supplies glibc, libstdc++, and libgcc. Never transplant Ubuntu's
 # loader/libc into Distroless; all other transitive libraries are collected.

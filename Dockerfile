@@ -6,7 +6,7 @@ ARG CUDA_ARCHITECTURES="80;86;89;90;100;120;121"
 ARG BUILD_JOBS=2
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git cmake ninja-build g++ python3 libgomp1 \
+    ca-certificates git cmake ninja-build g++ python3 libgomp1 pkg-config libsentencepiece-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN git init /src \
     && git -C /src remote add origin https://github.com/NVIDIA/NeMo-Speech.cpp.git \
@@ -17,7 +17,7 @@ RUN git init /src \
 RUN cmake -S /src -B /build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/nemo \
     -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" \
-    -DGGML_CUDA=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=OFF \
+    -DGGML_CUDA=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=OFF -DGGML_CUDA_NCCL=OFF \
     -DNEMO_SPEECH_BUILD_ASR=ON -DNEMO_SPEECH_BUILD_HTTP=ON \
     -DNEMO_SPEECH_BUILD_DIAR=OFF -DNEMO_SPEECH_BUILD_TTS=OFF \
     -DNEMO_SPEECH_BUILD_NMT=OFF -DNEMO_SPEECH_BUILD_S2S=OFF \
