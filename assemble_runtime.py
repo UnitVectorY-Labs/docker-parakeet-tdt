@@ -31,11 +31,13 @@ pending = [Path('/opt/nemo/bin/nemo-speech'), *Path('/opt/nemo/lib').glob('*.so*
 seen = set()
 while pending:
     binary = pending.pop()
+    # Preserve every requested SONAME even when several symlinks resolve to
+    # the same ELF file; only dependency scanning can be deduplicated.
+    if binary.name != 'nemo-speech':
+        shutil.copy2(binary.resolve(), prefix / 'lib' / binary.name)
     if binary.resolve() in seen:
         continue
     seen.add(binary.resolve())
-    if binary.name != 'nemo-speech':
-        shutil.copy2(binary.resolve(), prefix / 'lib' / binary.name)
     result = subprocess.run(['ldd', str(binary)], env=env, text=True, capture_output=True, check=True)
     for line in result.stdout.splitlines():
         if 'not found' in line:
