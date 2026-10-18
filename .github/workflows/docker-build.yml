@@ -1,0 +1,98 @@
+name: Build and publish CUDA runtime
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - tests/**
+      - assemble_runtime.py
+      - .github/workflows/docker-build.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - tests/**
+      - assemble_runtime.py
+      - .github/workflows/docker-build.yml
+  schedule:
+    - cron: '0 2 * * 6'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            cuda_architectures: '121'
+          - arch: amd64
+            runner: ubuntu-24.04
+            cuda_architectures: '80;86;89;90;100;120'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build, CPU test, and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/unitvectory-labs/docker-parakeet-tdt:sha-${{ github.sha }}-run-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+          build-args: |
+            CUDA_ARCHITECTURES=${{ matrix.cuda_architectures }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/UnitVectorY-Labs/docker-parakeet-tdt
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Parakeet TDT CUDA transcription runtime
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
+  manifest:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-platform tags
+        env:
+          IMAGE: ghcr.io/unitvectory-labs/docker-parakeet-tdt
+          SHA: ${{ github.sha }}
+          RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          docker buildx imagetools create \
+            -t "${IMAGE}:current" -t "${IMAGE}:sha-${SHA}-run-${RUN}" \
+            "${IMAGE}:sha-${SHA}-run-${RUN}-arm64" "${IMAGE}:sha-${SHA}-run-${RUN}-amd64"
+          if ! docker buildx imagetools inspect "${IMAGE}:sha-${SHA}" >/dev/null 2>&1; then
+            docker buildx imagetools create -t "${IMAGE}:sha-${SHA}" "${IMAGE}:sha-${SHA}-run-${RUN}"
+          fi
+          docker buildx imagetools inspect "${IMAGE}:current"
+          docker buildx imagetools create -t "${IMAGE}:current-arm64" "${IMAGE}:sha-${SHA}-run-${RUN}-arm64"
+          docker buildx imagetools create -t "${IMAGE}:current-amd64" "${IMAGE}:sha-${SHA}-run-${RUN}-amd64"
