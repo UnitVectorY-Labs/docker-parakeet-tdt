@@ -47,16 +47,36 @@ no local image build was used. On NVIDIA GB10 with driver **580.178.04**:
 Raw evidence lives on the test host at `/tmp/opencode/parakeet-jfk-timestamped.json`
 and `/tmp/opencode/parakeet-gpu.log`, not in Git.
 
+Both architecture jobs and the manifest job subsequently completed successfully
+in run 39175731583. The published multi-platform index was
+`sha256:9ff32d13e61d56ee7cfe293619d6176eec8ec5132213e47e96d012eef59898f7`;
+its ARM64 platform manifest is the same one tested above.
+
 AMD64 GPU inference, long recordings, dataset-level timestamp accuracy, TTL
 expiry, Docker's periodic health transition, and LLM/TTS co-loading remain
-unverified. ARM64 validation does not establish the status of the separate
-AMD64 build or multi-platform tag publication.
+unverified. Successful AMD64 CPU/build checks do not establish AMD64 GPU inference.
 
-## CUDA version-bump PR
+## Merged CUDA update and dependency maintenance (2026-10-19)
 
-PR #1 proposes CUDA 13.0.2 → 13.4.2; it is unrelated to the missing
-SentencePiece failure. It was not merged. R580 supports CUDA 13.x minor-version
-compatibility with PTX/new-feature limitations; GPU-less build checks cannot
-establish actual new CUDA/cuBLAS compatibility. Rebase onto the fixed main and
-validate on GB10 separately before adopting the bump, including updating the
-README's version references.
+PR #1 (CUDA 13.0.2 → 13.4.2) was merged by the repository owner on
+2026-10-19. It is unrelated to the earlier missing-SentencePiece failure.
+The implementation and README now use that merged main as their base.
+R580 supports CUDA 13.x minor-version compatibility with PTX/new-feature
+limitations; GPU-less build checks cannot establish actual new CUDA/cuBLAS
+compatibility. The successful GPU test above remains evidence for the old
+CUDA 13.0.2 artifact only, not the CUDA 13.4.2 image.
+
+NeMo-Speech.cpp now uses a Dependabot-managed Git submodule rather than a
+Dockerfile SHA ARG. The initial recorded revision remains the previously
+tested `caa3f47c7c75fa2e9e6340272ebad57c1647dd44`; this packaging change does
+not silently upgrade upstream code. CI initializes and tests the recorded
+source and its required nested dependencies. Docker and Actions dependencies
+retain their existing Dependabot coverage. There are no pip dependencies
+to track in `requirements.txt`.
+
+Local validation of this maintenance change passed **8 unit tests** (four
+dependency-checkout checks and four timestamp-validation checks), Python/YAML
+syntax, Dependabot ecosystem coverage, CI submodule path filters, and
+`git diff --check`. No local image build was performed; the new CUDA 13.4.2
+image must pass GitHub CI and separate GPU validation before replacing the
+previously tested deployment digest.

@@ -3,3 +3,11 @@
 !assemble_runtime.py
 !tests/
 !tests/**
+!upstream/
+!upstream/**
+# Git metadata is host-specific and not needed by the source-archive build.
+**/.git
+**/.git/**
+# No model weights or test audio enter the image build context.
+**/*.gguf
+**/*.wav

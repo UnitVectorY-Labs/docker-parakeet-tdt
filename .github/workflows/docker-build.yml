@@ -5,6 +5,8 @@ on:
     paths:
       - Dockerfile
       - .dockerignore
+      - .gitmodules
+      - upstream/**
       - tests/**
       - assemble_runtime.py
       - .github/workflows/docker-build.yml
@@ -12,6 +14,8 @@ on:
     paths:
       - Dockerfile
       - .dockerignore
+      - .gitmodules
+      - upstream/**
       - tests/**
       - assemble_runtime.py
       - .github/workflows/docker-build.yml
@@ -44,8 +48,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Test timestamp assertions
-        run: python3 -m unittest discover -s tests -p test_transcribe.py -v
+      - name: Initialize ASR source dependencies
+        run: |
+          git submodule update --init --depth 1 upstream/NeMo-Speech.cpp
+          git -C upstream/NeMo-Speech.cpp submodule update --init --depth 1 llama.cpp third_party/cpp-httplib
+      - name: Test dependency checkout and timestamp assertions
+        run: PYTHONPATH=tests python3 -m unittest test_dependencies test_transcribe -v
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: github.event_name != 'pull_request'

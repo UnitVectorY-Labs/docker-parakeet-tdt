@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
 FROM nvidia/cuda:13.4.2-devel-ubuntu24.04 AS builder
-ARG NEMO_SPEECH_REF=caa3f47c7c75fa2e9e6340272ebad57c1647dd44
 # Portable native builds: no build-host CPU/GPU autodetection. Includes GB10 sm_121.
 ARG CUDA_ARCHITECTURES="80;86;89;90;100;120;121"
 ARG BUILD_JOBS=2
@@ -8,12 +7,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git cmake ninja-build g++ python3 libgomp1 pkg-config libsentencepiece-dev \
     && rm -rf /var/lib/apt/lists/*
-RUN git init /src \
-    && git -C /src remote add origin https://github.com/NVIDIA/NeMo-Speech.cpp.git \
-    && git -C /src fetch --depth 1 origin "${NEMO_SPEECH_REF}" \
-    && git -C /src checkout --detach FETCH_HEAD \
-    && test "$(git -C /src rev-parse HEAD)" = "${NEMO_SPEECH_REF}" \
-    && git -C /src submodule update --init --depth 1 llama.cpp third_party/cpp-httplib
+# The source revision is a Dependabot-managed Git submodule, not a Docker ARG.
+# Initialize its required nested submodules before building (see README).
+COPY upstream/NeMo-Speech.cpp /src
+RUN test -f /src/llama.cpp/ggml/CMakeLists.txt \
+    && test -f /src/third_party/cpp-httplib/httplib.h
 RUN cmake -S /src -B /build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/nemo \
     -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" \

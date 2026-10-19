@@ -1,12 +1,13 @@
 # docker-parakeet-tdt
 
 Purpose-built NVIDIA Parakeet TDT 0.6B v3 CUDA transcription server, using
-unmodified [NVIDIA/NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp)
-pinned to `caa3f47c7c75fa2e9e6340272ebad57c1647dd44`. Only ASR, its CLI and HTTP
+unmodified [NVIDIA/NeMo-Speech.cpp](https://github.com/NVIDIA/NeMo-Speech.cpp),
+tracked in the Dependabot-managed `upstream/NeMo-Speech.cpp` Git submodule.
+Only ASR, its CLI and HTTP
 server are built; no Python, NeMo toolkit, Torch, TTS, diarization, NMT, gRPC,
 microphone capture, or API wrapper. The runtime is Google Distroless
 `cc-debian13:nonroot`, UID/GID 1000, with the native binary and required ELF/CUDA
-libraries copied from a CUDA 13.0.2 Ubuntu 24.04 builder. No shell, compiler,
+libraries copied from a CUDA 13.4.2 Ubuntu 24.04 builder. No shell, compiler,
 package manager, CUDA toolkit, driver, or model weights are shipped.
 
 ## Model and run
@@ -36,6 +37,11 @@ Requires NVIDIA Container Toolkit and a CUDA 13-compatible host driver. CI
 builds native Linux ARM64 for DGX Spark/GB10 (`sm_121`) and native AMD64 for
 `sm_80/86/89/90/100/120`; no emulation or build-host GPU autodetection. Other
 targets need a rebuild with `--build-arg CUDA_ARCHITECTURES=...`.
+CUDA 13.4.2 incorporates the merged base-image update (PR #1). R580 drivers
+use CUDA 13.x minor-version compatibility, with limitations around PTX and
+new driver features. The recorded GB10 inference test used CUDA 13.0.2;
+it is not validation of the newer CUDA/cuBLAS runtime. Retest new images
+before replacing a working digest-pinned deployment.
 
 Entrypoint: `/opt/nemo/bin/nemo-speech`. Default command:
 
@@ -129,11 +135,37 @@ Do not broaden an external proxy's endpoint allowlist implicitly.
 ## Builds and validation
 
 Follows [docker-breeze-tts](https://github.com/UnitVectorY-Labs/docker-breeze-tts)
-conventions: multi-stage Distroless, non-root, external weights, SHA-pinned
-upstream and Actions, native `ubuntu-24.04-arm`/`ubuntu-24.04` runners, PR builds
+conventions: multi-stage Distroless, non-root, external weights, reproducible
+upstream checkout and SHA-pinned Actions, native `ubuntu-24.04-arm`/`ubuntu-24.04` runners, PR builds
 without publication, push/manual/weekly Saturday 02:00 UTC builds, GHCR OCI
-labels, and weekly Docker/Actions Dependabot updates. No Python requirements
-or Breeze-specific runtime policies are needed.
+labels, and weekly Docker/Git-submodule/Actions Dependabot updates.
+
+### Dependency maintenance
+
+This is a native C++ runtime, **not a pip application**. A `requirements.txt`
+would not let Dependabot update NeMo-Speech.cpp, CUDA, or system packages.
+Dependencies use their actual supported manifests instead:
+
+| Dependency | Manifest / recorded version | Update mechanism |
+|---|---|---|
+| NeMo-Speech.cpp | `.gitmodules` + the `upstream/NeMo-Speech.cpp` Git revision | Dependabot `gitsubmodule` PRs |
+| ggml/llama.cpp and cpp-httplib | Nested submodule revisions recorded by NeMo-Speech.cpp | Follow the selected upstream revision; not floated independently |
+| CUDA builder and Distroless runtime | `FROM` image tags in `Dockerfile` | Dependabot `docker` PRs (as with merged PR #1) |
+| CI Actions | Workflow action revisions | Dependabot `github-actions` PRs |
+| Compiler, SentencePiece, and other build/system libraries | Unversioned apt package names in `Dockerfile` | Distribution updates on each fresh/scheduled rebuild, not Dependabot version PRs |
+
+There is no hidden upstream version ARG or source download in the Dockerfile.
+Each checkout still records an exact source revision for reproducibility;
+Dependabot proposes revision changes for review. Submodule changes trigger
+both architecture builds and CPU checks before publication. CI initializes
+only the two nested dependencies needed for ASR/HTTP. Git metadata, GGUF
+weights, and test audio are excluded from the build context.
+
+To inspect the selected revision:
+
+```sh
+git ls-tree HEAD upstream/NeMo-Speech.cpp
+```
 
 Tags: `current`, `current-arm64`, `current-amd64`, first-success `sha-<full SHA>`,
 unique `sha-<full SHA>-run-<run ID>-<attempt>` and matching architecture run tags.
@@ -141,11 +173,17 @@ Use a manifest digest for immutable deployment. GHCR package visibility may
 need to be made public separately by an organization admin.
 
 ```sh
+git clone https://github.com/UnitVectorY-Labs/docker-parakeet-tdt.git
+cd docker-parakeet-tdt
+git submodule update --init --depth 1 upstream/NeMo-Speech.cpp
+git -C upstream/NeMo-Speech.cpp submodule update --init --depth 1 llama.cpp third_party/cpp-httplib
+PYTHONPATH=tests python3 -m unittest test_dependencies test_transcribe -v
 docker build --build-arg CUDA_ARCHITECTURES=121 -t parakeet-tdt:local .
 gh workflow run docker-build.yml --repo UnitVectorY-Labs/docker-parakeet-tdt
 ```
 
-Every build checks the packaged ELF/CUDA libraries, absence of weights/driver,
+Every build verifies the source checkout matches all recorded submodule
+revisions, then checks the packaged ELF/CUDA libraries, absence of weights/driver,
 non-root home ownership, notices, and excluded tooling. It executes CLI/server/
 health help in the actual shell-free runtime. A **test-stage-only** CUDA driver
 stub permits these checks on GPU-less CI; the final image never contains it.
