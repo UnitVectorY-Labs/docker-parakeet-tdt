@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM nvidia/cuda:13.4.2-devel-ubuntu24.04 AS builder
+FROM nvidia/cuda:13.4.3-devel-ubuntu24.04 AS builder
 # Portable native builds: no build-host CPU/GPU autodetection. Includes GB10 sm_121.
 ARG CUDA_ARCHITECTURES="80;86;89;90;100;120;121"
 ARG BUILD_JOBS=2
