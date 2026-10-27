@@ -65,6 +65,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
+          sbom: true
           platforms: linux/${{ matrix.arch }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/unitvectory-labs/docker-parakeet-tdt:sha-${{ github.sha }}-run-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
